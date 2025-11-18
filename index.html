@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>狼人杀角色标记工具</title>
+  <!-- 引入外部资源 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- 临时回退样式：用于诊断为何 Tailwind/自定义样式未生效（页面调试用，可随后删除） -->
+  <style id="debug-fallback">
+    /* 如果页面完全无样式，会看到深色背景和白色文字 — 说明浏览器能应用原生CSS，但 Tailwind/Special style 未生效 */
+    html,body { background: #0f1724; color: #e6eef8; }
+    h1 { color: #fff; }
+    .btn-debug { background: #334155; color: #fff; border-radius: 6px; padding: 6px 10px; }
+  </style>
+
+  <style>
+    /* When modal is open, prevent background from scrolling and ensure centering */
+    body.modal-open {
+      overflow: hidden !important;
+      height: 100vh !important;
+      touch-action: none;
+    }
+    /* Ensure modal centers when no background scroll present (only on wider screens) */
+    @media (min-width: 641px) {
+      body.modal-open #roleModal { align-items: center; }
+    }
+  </style>
+  
+  <!-- Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6c5ce7',
+            secondary: '#a29bfe',
+            villager: '#2ecc71',
+            seer: '#3498db',
+            witch: '#9b59b6',
+            hunter: '#f39c12',
+            guard: '#1abc9c',
+            exorcist: '#ffd700',
+            knight: '#27ae60',
+            wolf: '#e74c3c',
+            wolfKing: '#8b0000',
+            wolfBeauty: '#ff1493',
+            ghostRider: '#2f4f4f',
+            thief: '#8e44ad',
+            cupid: '#fd79a8',
+            idiot: '#7f8c8d',
+            merchant: '#c0a080',
+            background: '#1a1a2e'
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      
+      /* 动态背景 - 性能优化版本 */
+      @keyframes gradientShift {
+        0% {
+          background-position: 0% 0%;
+        }
+        25% {
+          background-position: 100% 50%;
+        }
+        50% {
+          background-position: 100% 100%;
+        }
+        75% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 0% 0%;
+        }
+      }
+      
+      @keyframes gradientPulse {
+        0%, 100% {
+          opacity: 0.95;
+          filter: brightness(1);
+        }
+        50% {
+          opacity: 1;
+          filter: brightness(1.1);
+        }
+      }
+      
+      body {
+        /* 血月黑暗夜 + 白天乡镇伪祥和的混合过渡 */
+        background: linear-gradient(
+          135deg,
+          #0a0a0f 0%,        /* 深黑 - 血月之夜 */
+          #2d0a1a 12%,       /* 暗红 - 血月阴影 */
+          #1a0f2e 25%,       /* 深紫 - 神秘感 */
+          #0f1a3c 38%,       /* 深蓝 - 夜色渐浅 */
+          #1a2a4a 50%,       /* 蓝灰 - 天亮的预兆 */
+          #3a2a1a 62%,       /* 土黄 - 晨曦乡镇色 */
+          #4a3a2a 75%,       /* 棕色 - 古朴乡镇 */
+          #5a4a3a 88%,       /* 浅棕 - 白天温暖 */
+          #6a5a4a 100%       /* 米色 - 平和伪祥和 */
+        );
+        background-size: 200% 200%;
+        animation: gradientShift 30s ease-in-out infinite, gradientPulse 8s ease-in-out infinite;
+        will-change: background-position, opacity, filter;
+        contain: layout style paint;
+      }
+      
+      /* 性能优化：减少重排 */
+      @media (prefers-reduced-motion: reduce) {
+        body {
+          animation: none;
+          background: linear-gradient(to bottom right, #1a1a2e, #0f3460);
+        }
+      }
+      
+      @media (max-width: 768px) {
+        body {
+          animation-duration: 20s;
+        }
+      }
+      
+      /* 背景光晕效果 - 极低成本 */
+      body::before {
+        content: '';
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: 
+          /* 血月光晕 - 左上方红色阴郁 */
+          radial-gradient(circle at 15% 20%, rgba(180, 20, 40, 0.25) 0%, transparent 40%),
+          /* 黑暗夜幕 - 中心深紫色 */
+          radial-gradient(circle at 50% 50%, rgba(60, 20, 80, 0.15) 0%, transparent 50%),
+          /* 乡镇晨曦 - 右下方温暖橙黄 */
+          radial-gradient(circle at 85% 85%, rgba(200, 120, 40, 0.20) 0%, transparent 45%),
+          /* 祥和天光 - 顶部柔和蓝白 */
+          radial-gradient(circle at 50% 10%, rgba(100, 150, 200, 0.12) 0%, transparent 35%);
+        animation: floatGlow 35s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -1;
+        will-change: transform;
+      }
+      
+      @keyframes floatGlow {
+        0% {
+          transform: translate(0, 0) scale(1);
+        }
+        25% {
+          transform: translate(50px, -40px) scale(1.05);
+        }
+        50% {
+          transform: translate(80px, 30px) scale(1);
+        }
+        75% {
+          transform: translate(-30px, 50px) scale(1.05);
+        }
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+      }
+      
+      @media (prefers-reduced-motion: reduce) {
+        body::before {
+          animation: none;
+        }
+      }
+      /* 低成本背景狼效果 */
+      .wolf-bg {
+        position: fixed;
+        right: -8%;
+        bottom: -8%;
+        width: 60vmin;
+        height: 60vmin;
+        pointer-events: none;
+        opacity: 0.12;
+        z-index: -1;
+        transform: translate3d(0,0,0);
+        will-change: transform, opacity;
+        filter: saturate(0.8) contrast(1.1) hue-rotate(10deg) drop-shadow(0 0 40px rgba(180, 20, 40, 0.3));
+        transition: opacity 300ms ease;
+      }
+      .wolf-bg svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .wolf-bg text { font-family: system-ui, "Segoe UI Emoji", "Noto Color Emoji", serif; }
+
+      .wolf-animate {
+        animation: wolfFloat 15s ease-in-out infinite, wolfGlow 6s ease-in-out infinite;
+      }
+      @keyframes wolfFloat {
+        0% { transform: translateY(0) rotate(-5deg) scale(1); }
+        25% { transform: translateY(-15px) rotate(2deg) scale(1.02); }
+        50% { transform: translateY(-25px) rotate(-3deg) scale(1); }
+        75% { transform: translateY(-10px) rotate(4deg) scale(1.02); }
+        100% { transform: translateY(0) rotate(-5deg) scale(1); }
+      }
+      @keyframes wolfGlow {
+        0%, 100% { filter: saturate(0.8) contrast(1.1) hue-rotate(10deg) drop-shadow(0 0 20px rgba(180, 20, 40, 0.2)); }
+        50% { filter: saturate(1) contrast(1.3) hue-rotate(15deg) drop-shadow(0 0 50px rgba(180, 20, 40, 0.4)); }
+      }
+      
+      /* 隐藏/禁用时更省资源 */
+      .wolf-hidden { opacity: 0 !important; pointer-events: none; }
+      @media (prefers-reduced-motion: reduce) {
+        .wolf-animate { animation: none; }
+      }
+      /* 优化：尝试将原生下拉的下拉项设为深色（浏览器对 option 支持不一致） */
+      #playerCount, select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background: linear-gradient(180deg,#222834,#111827);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.06);
+        padding-right: 2.5rem;
+      }
+      #playerCount option {
+        background-color: #0b1220;
+        color: #fff;
+      }
+      select::-ms-expand { display:none; }
+
+      .player-card {
+        @apply w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-lg sm:rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105 shadow-lg relative overflow-hidden;
+      }
+      /* 死亡状态：框颜色变暗，叠加"死亡"文字 */
+      .player-card.dead {
+        @apply brightness-50 filter drop-shadow-lg;
+      }
+      .player-card.dead::after {
+        content: '';
+        @apply absolute inset-0 bg-red-950/40 pointer-events-none;
+      }
+      .player-card.dead::before {
+        content: '死亡';
+        @apply absolute inset-0 flex items-center justify-center text-lg md:text-2xl font-black text-red-300 pointer-events-none drop-shadow-md z-10;
+      }
+      /* 投票出局状态：框颜色变暗，叠加"投票"文字（死亡状态优先） */
+      .player-card.vote-out:not(.dead) {
+        @apply brightness-50 filter drop-shadow-lg;
+      }
+      .player-card.vote-out:not(.dead)::after {
+        content: '';
+        @apply absolute inset-0 bg-blue-950/40 pointer-events-none;
+      }
+      .player-card.vote-out:not(.dead)::before {
+        content: '投票';
+        @apply absolute inset-0 flex items-center justify-center text-lg md:text-2xl font-black text-blue-300 pointer-events-none drop-shadow-md z-10;
+      }
+      .player-card.locked {
+        @apply ring-2 ring-yellow-400 ring-offset-2 ring-offset-background;
+      }
+      .player-number {
+        @apply text-lg sm:text-2xl md:text-3xl font-bold mb-0.5 sm:mb-1;
+      }
+      .player-role {
+        @apply text-xs sm:text-xs md:text-sm font-medium truncate w-full text-center;
+      }
+      .role-option {
+        @apply flex items-center p-2 rounded-md cursor-pointer hover:bg-gray-700 transition-colors duration-200;
+      }
+      .role-option:hover {
+        background: linear-gradient(90deg, rgba(108, 92, 231, 0.2), rgba(52, 152, 219, 0.1));
+      }
+      .role-option span:first-child {
+        @apply text-xl leading-none;
+      }
+      .role-color-indicator {
+        @apply w-3 h-3 rounded-full mr-2;
+      }
+      .status-icon {
+        @apply absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs opacity-80;
+      }
+      
+      /* 隐藏角色信息 */
+      .hide-roles .player-card {
+        background-color: #4b5563 !important;
+        background-image: none !important;
+      }
+      
+      .hide-roles .player-role {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      /* 增强的卡片样式 */
+      .glass-card {
+        background: rgba(30, 30, 46, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+      
+      /* 按钮增强 */
+      .btn-enhanced {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+      
+      .btn-enhanced::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s ease;
+      }
+      
+      .btn-enhanced:hover::before {
+        left: 100%;
+      }
+      
+      /* 标题光晕效果 */
+      header {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* 隐藏角色按键active状态（顶层样式，覆盖 Tailwind 类） */
+      #toggleRolesBtn {
+        background: linear-gradient(to right, #4b5563, #3f4a57) !important;
+        transition: all 0.3s ease;
+      }
+
+      #toggleRolesBtn.active {
+        background: linear-gradient(to right, #7c3aed, #6d28d9) !important;
+      }
+
+      #toggleRolesBtn.active:hover {
+        background: linear-gradient(to right, #6d28d9, #5b21b6) !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen font-inter text-white p-4 md:p-8">
+  <!-- 低成本背景狼元素（可切换） -->
+  <div id="wolfBg" class="wolf-bg" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+      <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" font-size="140">🐺</text>
+    </svg>
+  </div>
+  <!-- 页面标题 -->
+  <header class="text-center mb-8">
+    <h1 class="text-[clamp(1.8rem,5vw,2.8rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">狼人杀角色标记工具</h1>
+    <p class="text-gray-400 mt-2">点击玩家位置为其分配你推断的角色</p>
+  </header>
+
+  <!-- 控制面板 -->
+  <div class="flex flex-wrap items-center justify-between gap-2 md:gap-4 mb-8 max-w-6xl mx-auto px-2">
+    <div class="flex items-center gap-2 md:gap-3 flex-wrap w-full md:w-auto">
+      <button id="resetBtn" class="btn-enhanced flex items-center gap-1 md:gap-2 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 px-2 md:px-4 py-2 rounded-lg transition-all duration-200 shadow-lg text-sm md:text-base">
+        <i class="fas fa-redo text-sm md:text-base"></i>
+        <span class="hidden sm:inline">重置所有</span>
+        <span class="sm:hidden">重置</span>
+      </button>
+      <button id="clearBtn" class="btn-enhanced flex items-center gap-1 md:gap-2 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 px-2 md:px-4 py-2 rounded-lg transition-all duration-200 shadow-lg text-sm md:text-base">
+        <i class="fas fa-eraser text-sm md:text-base"></i>
+        <span class="hidden sm:inline">清除标记</span>
+        <span class="sm:hidden">清除</span>
+      </button>
+      <button id="toggleRolesBtn" class="btn-enhanced flex items-center gap-1 md:gap-2 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 px-2 md:px-4 py-2 rounded-lg transition-all duration-200 shadow-lg text-sm md:text-base" title="显示/隐藏角色信息">
+        <i class="fas fa-eye text-sm md:text-base"></i>
+        <span id="toggleRolesText" class="hidden sm:inline">隐藏角色</span>
+        <span id="toggleRolesText-short" class="sm:hidden text-xs">隐藏</span>
+      </button>
+    </div>
+    
+    <div class="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+      <label for="playerCount" class="text-gray-300 font-medium text-sm md:text-base whitespace-nowrap">玩家:</label>
+      <select id="playerCount" class="bg-gradient-to-r from-gray-800 to-gray-700 border border-gray-600 text-white rounded-lg px-2 md:px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary hover:border-gray-500 transition-all duration-200 shadow-md text-sm md:text-base flex-1 md:flex-auto">
+        <option value="6">6人</option>
+        <option value="7">7人</option>
+        <option value="8">8人</option>
+        <option value="9" selected>9人</option>
+        <option value="10">10人</option>
+        <option value="11">11人</option>
+        <option value="12">12人</option>
+        <option value="15">15人</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 玩家区域 -->
+  <div id="playersContainer" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4 lg:gap-6 max-w-7xl mx-auto mb-12 px-2">
+    <!-- 玩家卡片将通过JS动态生成 -->
+  </div>
+
+  <!-- 角色说明 -->
+  <div class="glass-card max-w-6xl mx-auto rounded-2xl p-4 md:p-8 mb-8 mx-2">
+    <h2 class="text-xl md:text-2xl font-bold mb-6 md:mb-8 text-center bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">角色与状态说明</h2>
+    
+    <!-- 角色分类展示 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-8 mb-6 md:mb-8">
+      <!-- 神职阵营 -->
+      <div class="border border-gray-600 rounded-lg p-3 md:p-4">
+        <h3 class="text-base md:text-lg font-bold mb-2 md:mb-3 text-blue-400 flex items-center gap-2">
+          <i class="fas fa-book text-blue-400 text-sm md:text-base"></i>
+          <span class="text-sm md:text-base">神职阵营</span>
+        </h3>
+        <div id="priestlyRoles" class="space-y-1 md:space-y-2">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+      
+      <!-- 狼族阵营 -->
+      <div class="border border-gray-600 rounded-lg p-3 md:p-4">
+        <h3 class="text-base md:text-lg font-bold mb-2 md:mb-3 text-red-400 flex items-center gap-2">
+          <i class="fas fa-moon-o text-red-400 text-sm md:text-base"></i>
+          <span class="text-sm md:text-base">狼族阵营</span>
+        </h3>
+        <div id="wolfRoles" class="space-y-1 md:space-y-2">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+      
+      <!-- 第三阵营 -->
+      <div class="border border-gray-600 rounded-lg p-3 md:p-4">
+        <h3 class="text-base md:text-lg font-bold mb-2 md:mb-3 text-purple-400 flex items-center gap-2">
+          <i class="fas fa-hat-wizard text-purple-400 text-sm md:text-base"></i>
+          <span class="text-sm md:text-base">第三阵营</span>
+        </h3>
+        <div id="thirdRoles" class="space-y-1 md:space-y-2">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+      
+      <!-- 基础角色 -->
+      <div class="border border-gray-600 rounded-lg p-3 md:p-4">
+        <h3 class="text-base md:text-lg font-bold mb-2 md:mb-3 text-green-400 flex items-center gap-2">
+          <i class="fas fa-users text-green-400 text-sm md:text-base"></i>
+          <span class="text-sm md:text-base">基础角色</span>
+        </h3>
+        <div id="basicRoles" class="space-y-1 md:space-y-2">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- 状态标识 -->
+    <div class="border border-gray-600 rounded-lg p-3 md:p-4 bg-gray-800/30">
+      <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-yellow-400 flex items-center gap-2">
+        <i class="fas fa-info-circle text-yellow-400 text-sm md:text-base"></i>
+        <span class="text-sm md:text-base">状态标识</span>
+      </h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <div class="flex items-start gap-2 md:gap-3">
+          <div class="flex-shrink-0 mt-0.5">
+            <i class="fas fa-lock text-yellow-400 text-sm md:text-base"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-yellow-400 text-sm md:text-base">已锁定</div>
+            <div class="text-xs md:text-sm text-gray-400">角色已确认，无法修改</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2 md:gap-3">
+          <div class="flex-shrink-0 mt-0.5">
+            <div class="w-5 h-5 md:w-6 md:h-6 bg-red-500/50 rounded border-2 border-red-300 flex items-center justify-center text-red-300 text-xs font-bold">死</div>
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-red-400 text-sm md:text-base">已死亡</div>
+            <div class="text-xs md:text-sm text-gray-400">卡片变暗，显示死亡状态</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-2 md:gap-3">
+          <div class="flex-shrink-0 mt-0.5">
+            <div class="w-5 h-5 md:w-6 md:h-6 bg-blue-500/50 rounded border-2 border-blue-300 flex items-center justify-center text-blue-300 text-xs font-bold">投</div>
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-blue-400 text-sm md:text-base">被投票出局</div>
+            <div class="text-xs md:text-sm text-gray-400">卡片变暗，显示投票出局</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 角色选择模态框 -->
+  <div id="roleModal" class="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <div class="glass-card rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto transform scale-95 transition-transform duration-300">
+      <div class="p-6 border-b border-gray-600 flex justify-between items-center bg-gradient-to-r from-gray-800/50 to-transparent">
+        <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">玩家 <span id="modalPlayerNumber">1</span> 操作</h3>
+        <button id="closeModal" class="text-gray-400 hover:text-white transition-colors">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <h4 class="text-sm font-semibold text-gray-200 mb-3 uppercase tracking-wider">选择角色</h4>
+          <div id="rolesList" class="space-y-1 max-h-64 overflow-y-auto">
+            <!-- 角色选项将通过JS动态生成 -->
+          </div>
+        </div>
+        
+        <div class="border-t border-gray-600 pt-4">
+          <h4 class="text-sm font-semibold text-gray-200 mb-3 uppercase tracking-wider">状态操作</h4>
+          <div class="space-y-2">
+            <div class="role-option" id="lockOption">
+              <i class="fas fa-lock mr-2 text-yellow-400"></i>
+              <span>锁定/解锁角色</span>
+            </div>
+            <div class="role-option" id="deathOption">
+              <i class="fas fa-skull mr-2 text-red-400"></i>
+              <span>标记/取消死亡</span>
+            </div>
+            <div class="role-option" id="voteOutOption">
+              <i class="fas fa-thumbs-down mr-2 text-blue-400"></i>
+              <span>标记/取消被投票出局</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Responsive modal tweak: on small screens present as a bottom sheet that fits viewport */
+    @media (max-width: 640px) {
+      #roleModal {
+        align-items: flex-end; /* anchor to bottom */
+        padding: 0.5rem; /* allow safe-area spacing */
+      }
+
+      #roleModal > .glass-card {
+        border-radius: 0.75rem 0.75rem 0 0; /* rounded top only */
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100vh - 3.5rem); /* leave room for status bar / close button */
+        margin: 0;
+        transform: translateY(0) !important;
+        overflow: hidden; /* inner scroll handled by rolesList */
+      }
+
+      /* make the inner scroll area taller on small screens */
+      #rolesList {
+        max-height: calc(40vh);
+      }
+
+      /* reduce padding inside modal for mobile */
+      #roleModal .p-6 { padding: 0.75rem; }
+      #roleModal .p-6.border-b { padding: 0.5rem 0.75rem; }
+    }
+  </style>
+
+  <script>
+    /**
+     * ========== 配置管理系统 ==========
+     * 所有颜色、角色和状态都在这里集中管理，方便后续修改
+     */
+
+    // 颜色配置
+    const colorConfig = {
+      // Tailwind 颜色类名映射（用于CSS类名）
+      classes: {
+        unknown: 'bg-gray-600',
+        villager: 'bg-villager',
+        seer: 'bg-seer',
+        witch: 'bg-witch',
+        hunter: 'bg-hunter',
+        guard: 'bg-guard',
+        exorcist: 'bg-exorcist',
+        knight: 'bg-knight',
+        wolf: 'bg-wolf',
+        wolfKing: 'bg-wolfKing',
+        wolfBeauty: 'bg-wolfBeauty',
+        ghostRider: 'bg-ghostRider',
+        thief: 'bg-thief',
+        cupid: 'bg-cupid',
+        idiot: 'bg-idiot',
+        merchant: 'bg-merchant'
+      },
+      // 状态颜色配置
+      status: {
+        lock: { bgClass: 'bg-yellow-400/20', textClass: 'text-yellow-400', icon: 'fa-lock' },
+        death: { bgClass: 'bg-red-500/20', textClass: 'text-red-500', icon: 'fa-skull' },
+        voteOut: { bgClass: 'bg-blue-500/20', textClass: 'text-blue-400', icon: 'fa-thumbs-down' }
+      }
+    };
+
+    // 角色配置
+    const roleConfig = {
+      roles: [
+        { id: 'unknown', name: '未确定', icon: 'fa-question', colorKey: 'unknown' },
+        { id: 'villager', name: '平民', icon: 'fa-user', colorKey: 'villager' },
+        // 神职阵营
+        { id: 'seer', name: '预言家', icon: 'fa-eye', colorKey: 'seer' },
+        { id: 'witch', name: '女巫', icon: 'fa-flask', colorKey: 'witch' },
+        { id: 'hunter', name: '猎人', icon: 'fa-crosshairs', colorKey: 'hunter' },
+        { id: 'guard', name: '守卫', icon: 'fa-shield', colorKey: 'guard' },
+        { id: 'exorcist', name: '驱魔人', icon: 'fa-cross', colorKey: 'exorcist' },
+        { id: 'knight', name: '骑士', icon: 'fa-horse', colorKey: 'knight' },
+        // 狼族阵营
+        { id: 'wolf', name: '狼人', icon: 'fa-moon-o', colorKey: 'wolf' },
+        { id: 'wolfKing', name: '狼王', icon: 'fa-crown', colorKey: 'wolfKing' },
+        { id: 'wolfBeauty', name: '狼美人', icon: 'fa-heart', colorKey: 'wolfBeauty' },
+        { id: 'ghostRider', name: '恶灵骑士', icon: 'fa-motorcycle', colorKey: 'ghostRider' },
+        // 第三阵营
+        { id: 'thief', name: '盗贼', icon: 'fa-hand-paper-o', colorKey: 'thief' },
+        { id: 'cupid', name: '丘比特', icon: 'fa-heart', colorKey: 'cupid' },
+        { id: 'idiot', name: '白痴', icon: 'fa-meh-o', colorKey: 'idiot' },
+        { id: 'merchant', name: '商人', icon: 'fa-briefcase', colorKey: 'merchant' }
+      ],
+      // 获取角色的完整信息
+      getRole: function(roleId) {
+        return this.roles.find(r => r.id === roleId);
+      },
+      // 获取角色颜色类名
+      getRoleColor: function(roleId) {
+        const role = this.getRole(roleId);
+        return role ? colorConfig.classes[role.colorKey] : colorConfig.classes.unknown;
+      },
+      // 获取所有角色
+      getAllRoles: function() {
+        return this.roles;
+      }
+    };
+
+    // 状态配置
+    const statusConfig = {
+      // 获取状态的颜色配置
+      getLockConfig: function() {
+        return colorConfig.status.lock;
+      },
+      getDeathConfig: function() {
+        return colorConfig.status.death;
+      },
+      getVoteOutConfig: function() {
+        return colorConfig.status.voteOut;
+      }
+    };
+
+    // 为了向后兼容，创建 roles 数组
+    const roles = roleConfig.roles.map(role => ({
+      id: role.id,
+      name: role.name,
+      color: colorConfig.classes[role.colorKey],
+      icon: role.icon
+    }));
+
+    // 当前选中的玩家索引
+    let selectedPlayerIndex = -1;
+    
+    // 初始化玩家
+    function initPlayers(count = 9) {
+      const container = document.getElementById('playersContainer');
+      container.innerHTML = '';
+      
+      const unknownColorClass = roleConfig.getRoleColor('unknown');
+      const borderClass = unknownColorClass.replace('bg-', 'border-');
+      
+      for (let i = 1; i <= count; i++) {
+        const playerCard = document.createElement('div');
+        playerCard.className = `player-card ${unknownColorClass} border-2 border-opacity-50 ${borderClass}`;
+        playerCard.dataset.index = i - 1;
+        playerCard.dataset.role = 'unknown';
+        playerCard.dataset.locked = 'false';
+        playerCard.dataset.dead = 'false';
+        playerCard.dataset.voteOut = 'false';
+        
+        const unknownRole = roleConfig.getRole('unknown');
+        playerCard.innerHTML = `
+          <div class="player-number">${i}</div>
+          <div class="player-role">${unknownRole.name}</div>
+          <div class="status-icons"></div>
+        `;
+        
+        playerCard.addEventListener('click', () => openRoleModal(i - 1));
+        container.appendChild(playerCard);
+      }
+      
+      // 更新角色说明
+      updateRoleLegend();
+    }
+    
+    // 更新角色说明
+    function updateRoleLegend() {
+      // 按阵营分类角色
+      const priestlyRoles = ['seer', 'witch', 'hunter', 'guard', 'exorcist', 'knight'];
+      const wolfRoles = ['wolf', 'wolfKing', 'wolfBeauty', 'ghostRider'];
+      const thirdRoles = ['thief', 'cupid', 'idiot', 'merchant'];
+      const basicRoles = ['unknown', 'villager'];
+      
+      const renderRoles = (roles, containerId) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        
+        roles.forEach(roleId => {
+          const roleData = roleConfig.getRole(roleId);
+          if (roleData) {
+            const colorClass = colorConfig.classes[roleData.colorKey];
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between text-sm p-2 rounded hover:bg-gray-700/30 transition-colors';
+            item.innerHTML = `
+              <div class="flex items-center gap-2">
+                <span class="role-color-indicator ${colorClass}"></span>
+                <span>${roleData.name}</span>
+              </div>
+              <i class="fa ${roleData.icon} text-gray-500 text-sm"></i>
+            `;
+            container.appendChild(item);
+          }
+        });
+      };
+      
+      renderRoles(priestlyRoles, 'priestlyRoles');
+      renderRoles(wolfRoles, 'wolfRoles');
+      renderRoles(thirdRoles, 'thirdRoles');
+      renderRoles(basicRoles, 'basicRoles');
+    }
+    
+    // 更新玩家状态图标（仅显示锁定状态）
+    function updateStatusIcons(playerCard) {
+      const iconsContainer = playerCard.querySelector('.status-icons');
+      iconsContainer.innerHTML = '';
+      
+      // 只显示锁定图标
+      if (playerCard.dataset.locked === 'true') {
+        const lockConfig = colorConfig.status.lock;
+        const lockIcon = document.createElement('div');
+        lockIcon.className = `status-icon ${lockConfig.bgClass} ${lockConfig.textClass}`;
+        lockIcon.innerHTML = `<i class="fa ${lockConfig.icon}"></i>`;
+        iconsContainer.appendChild(lockIcon);
+      }
+    }
+    
+    // 打开角色选择模态框
+    function openRoleModal(index) {
+      selectedPlayerIndex = index;
+      const modal = document.getElementById('roleModal');
+      const rolesList = document.getElementById('rolesList');
+      const playerCards = document.querySelectorAll('.player-card');
+      const playerCard = playerCards[index];
+      
+      // 更新模态框标题中的玩家编号
+      document.getElementById('modalPlayerNumber').textContent = index + 1;
+      
+      // 清空并生成角色列表
+      rolesList.innerHTML = '';
+      roleConfig.getAllRoles().forEach(roleData => {
+        const roleItem = document.createElement('div');
+        const colorClass = colorConfig.classes[roleData.colorKey];
+        roleItem.className = `role-option ${playerCard.dataset.role === roleData.id ? 'bg-gray-700' : ''}`;
+        roleItem.dataset.role = roleData.id;
+        roleItem.disabled = playerCard.dataset.locked === 'true';
+        if (playerCard.dataset.locked === 'true') {
+          roleItem.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        roleItem.innerHTML = `
+          <span class="role-color-indicator ${colorClass}"></span>
+          <span>${roleData.name}</span>
+          <i class="fa ${roleData.icon} ml-auto text-gray-400"></i>
+        `;
+        
+        if (playerCard.dataset.locked === 'false') {
+          roleItem.addEventListener('click', () => selectRole(roleData.id));
+        }
+        rolesList.appendChild(roleItem);
+      });
+      
+      // 更新状态操作选项的文本（从配置动态生成）
+      const lockConfig = statusConfig.getLockConfig();
+      const deathConfig = statusConfig.getDeathConfig();
+      const voteOutConfig = statusConfig.getVoteOutConfig();
+      
+      document.getElementById('lockOption').querySelector('span').textContent = 
+        playerCard.dataset.locked === 'true' ? '解锁角色' : '锁定角色';
+      
+      document.getElementById('deathOption').querySelector('span').textContent = 
+        playerCard.dataset.dead === 'true' ? '取消死亡标记' : '标记死亡';
+      
+      document.getElementById('voteOutOption').querySelector('span').textContent = 
+        playerCard.dataset.voteOut === 'true' ? '取消被投票出局' : '标记被投票出局';
+      
+      // 显示模态框并添加动画
+      modal.classList.remove('hidden');
+      // prevent background scrolling
+      document.body.classList.add('modal-open');
+      setTimeout(() => {
+        modal.classList.add('opacity-100');
+        modal.querySelector('div').classList.remove('scale-95');
+        modal.querySelector('div').classList.add('scale-100');
+      }, 10);
+    }
+    
+    // 关闭角色选择模态框
+    function closeRoleModal() {
+      const modal = document.getElementById('roleModal');
+      modal.classList.remove('opacity-100');
+      modal.querySelector('div').classList.remove('scale-100');
+      modal.querySelector('div').classList.add('scale-95');
+      
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        // restore background scroll
+        document.body.classList.remove('modal-open');
+        selectedPlayerIndex = -1;
+      }, 300);
+    }
+    
+    // 选择角色
+    function selectRole(roleId) {
+      if (selectedPlayerIndex === -1) return;
+      
+      const playerCards = document.querySelectorAll('.player-card');
+      const playerCard = playerCards[selectedPlayerIndex];
+      
+      // 如果角色已锁定，则不能更改
+      if (playerCard.dataset.locked === 'true') return;
+      
+      const roleData = roleConfig.getRole(roleId);
+      const colorClass = roleConfig.getRoleColor(roleId);
+      
+      // 更新玩家卡片
+      playerCard.dataset.role = roleId;
+      const borderClass = colorClass.replace('bg-', 'border-');
+      const classes = ['player-card', colorClass, 'border-2', 'border-opacity-50', borderClass, 'transform', 'transition-all', 'duration-300'];
+      if (playerCard.dataset.dead === 'true') classes.push('dead');
+      if (playerCard.dataset.voteOut === 'true') classes.push('vote-out');
+      if (playerCard.dataset.locked === 'true') classes.push('locked');
+      playerCard.className = classes.join(' ');
+      
+      // 添加短暂的高亮效果
+      playerCard.classList.add('scale-110');
+      setTimeout(() => {
+        playerCard.classList.remove('scale-110');
+      }, 300);
+      
+      // 更新角色文本
+      playerCard.querySelector('.player-role').textContent = roleData.name;
+      
+      // 更新状态图标
+      updateStatusIcons(playerCard);
+      
+      closeRoleModal();
+    }
+    
+    // 切换锁定状态
+    function toggleLock() {
+      if (selectedPlayerIndex === -1) return;
+      
+      const playerCards = document.querySelectorAll('.player-card');
+      const playerCard = playerCards[selectedPlayerIndex];
+      const isLocked = playerCard.dataset.locked === 'true';
+      
+      playerCard.dataset.locked = !isLocked;
+      if (!isLocked) {
+        playerCard.classList.add('locked');
+      } else {
+        playerCard.classList.remove('locked');
+      }
+      
+      // 更新状态图标
+      updateStatusIcons(playerCard);
+      
+      // 重新打开模态框以更新选项状态
+      openRoleModal(selectedPlayerIndex);
+    }
+    
+    // 切换死亡状态
+    function toggleDeath() {
+      if (selectedPlayerIndex === -1) return;
+      
+      const playerCards = document.querySelectorAll('.player-card');
+      const playerCard = playerCards[selectedPlayerIndex];
+      const isDead = playerCard.dataset.dead === 'true';
+      
+      playerCard.dataset.dead = !isDead;
+      if (!isDead) {
+        playerCard.classList.add('dead');
+      } else {
+        playerCard.classList.remove('dead');
+      }
+      
+      // 更新状态图标
+      updateStatusIcons(playerCard);
+      
+      // 重新打开模态框以更新选项文本
+      openRoleModal(selectedPlayerIndex);
+    }
+    
+    // 切换被投票出局状态
+    function toggleVoteOut() {
+      if (selectedPlayerIndex === -1) return;
+      
+      const playerCards = document.querySelectorAll('.player-card');
+      const playerCard = playerCards[selectedPlayerIndex];
+      const isVoteOut = playerCard.dataset.voteOut === 'true';
+      
+      playerCard.dataset.voteOut = !isVoteOut;
+      if (!isVoteOut) {
+        playerCard.classList.add('vote-out');
+      } else {
+        playerCard.classList.remove('vote-out');
+      }
+      
+      // 重新打开模态框以更新选项文本
+      openRoleModal(selectedPlayerIndex);
+    }
+    
+    // 重置所有玩家
+    function resetAllPlayers() {
+      const playerCount = document.getElementById('playerCount').value;
+      initPlayers(playerCount);
+    }
+    
+    // 清除所有标记（重置为未确定，同时清除状态，但尊重角色锁定）
+    function clearAllMarks() {
+      const playerCards = document.querySelectorAll('.player-card');
+      playerCards.forEach(card => {
+        // 如果角色已锁定，则跳过
+        if (card.dataset.locked === 'true') return;
+        
+        const colorClass = roleConfig.getRoleColor('unknown');
+        const borderClass = colorClass.replace('bg-', 'border-');
+        
+        card.dataset.role = 'unknown';
+        card.dataset.dead = 'false';
+        card.dataset.voteOut = 'false';
+        
+        card.className = `player-card ${colorClass} border-2 border-opacity-50 ${borderClass} transform transition-all duration-300`;
+        const roleData = roleConfig.getRole('unknown');
+        card.querySelector('.player-role').textContent = roleData.name;
+        
+        // 更新状态图标
+        updateStatusIcons(card);
+      });
+    }
+    
+    // 事件监听
+    document.addEventListener('DOMContentLoaded', () => {
+      // 初始化玩家
+      initPlayers();
+      
+      // 玩家数量变化
+      document.getElementById('playerCount').addEventListener('change', (e) => {
+        initPlayers(parseInt(e.target.value));
+      });
+      
+      // 关闭模态框
+      document.getElementById('closeModal').addEventListener('click', closeRoleModal);
+      
+      // 点击模态框背景关闭
+      document.getElementById('roleModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('roleModal')) {
+          closeRoleModal();
+        }
+      });
+      
+      // 锁定/解锁选项
+      document.getElementById('lockOption').addEventListener('click', toggleLock);
+      
+      // 死亡标记选项
+      document.getElementById('deathOption').addEventListener('click', toggleDeath);
+      
+      // 被投票出局选项
+      document.getElementById('voteOutOption').addEventListener('click', toggleVoteOut);
+      
+      // 重置按钮
+      document.getElementById('resetBtn').addEventListener('click', resetAllPlayers);
+      
+      // 清除按钮
+      document.getElementById('clearBtn').addEventListener('click', clearAllMarks);
+      
+      // 按ESC关闭模态框
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('roleModal').classList.contains('hidden')) {
+          closeRoleModal();
+        }
+      });
+
+      // 显示/隐藏角色开关
+      const toggleRolesBtn = document.getElementById('toggleRolesBtn');
+      const toggleRolesText = document.getElementById('toggleRolesText');
+      const toggleRolesTextShort = document.getElementById('toggleRolesText-short');
+      const playersContainer = document.getElementById('playersContainer');
+      
+      // 从localStorage获取状态
+      const rolesHidden = localStorage.getItem('rolesHidden') === 'true';
+      if (rolesHidden) {
+        playersContainer.classList.add('hide-roles');
+        if (toggleRolesText) toggleRolesText.textContent = '显示角色';
+        if (toggleRolesTextShort) toggleRolesTextShort.textContent = '显示';
+        toggleRolesBtn.classList.add('active');
+      }
+
+      toggleRolesBtn.addEventListener('click', () => {
+        const isHidden = playersContainer.classList.contains('hide-roles');
+        if (isHidden) {
+          playersContainer.classList.remove('hide-roles');
+          if (toggleRolesText) toggleRolesText.textContent = '隐藏角色';
+          if (toggleRolesTextShort) toggleRolesTextShort.textContent = '隐藏';
+          localStorage.setItem('rolesHidden', 'false');
+          toggleRolesBtn.classList.remove('active');
+        } else {
+          playersContainer.classList.add('hide-roles');
+          if (toggleRolesText) toggleRolesText.textContent = '显示角色';
+          if (toggleRolesTextShort) toggleRolesTextShort.textContent = '显示';
+          localStorage.setItem('rolesHidden', 'true');
+          toggleRolesBtn.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
