@@ -946,22 +946,17 @@
     // 切换感染者状态
     function toggleInfect() {
       if (selectedPlayerIndex === -1) return;
-      
       const playerCards = document.querySelectorAll('.player-card');
       const playerCard = playerCards[selectedPlayerIndex];
+      if (playerCard.dataset.role === 'zombie') return; // 禁止丧尸感染
       const isInfected = playerCard.dataset.infected === 'true';
-      
       playerCard.dataset.infected = !isInfected;
       if (!isInfected) {
         playerCard.classList.add('infected-outline');
       } else {
         playerCard.classList.remove('infected-outline');
       }
-      
-      // 更新状态图标
       updateStatusIcons(playerCard);
-      
-      // 重新打开模态框以更新选项文本
       openRoleModal(selectedPlayerIndex);
     }
     
